@@ -49,7 +49,7 @@ function TabBarItemBuilder(index: number, item: TabBarItem, state: TabBarState) 
 struct TextTabBarDemo {
   private mState: TabBarState = new TabBarState();
 
-  private mTabBarItems = [
+  private mTabBarItems: TabBarItem[] = [
     new TextTabBarItem('最新'),
     new TextTabBarItem('最热'),
     new TextTabBarItem('小桥流水'),

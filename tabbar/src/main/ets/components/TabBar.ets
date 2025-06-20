@@ -128,42 +128,44 @@ export struct TabBar {
 
   build() {
     Scroll(this.mScroller) {
-      Stack({ alignContent: Alignment.TopStart }) {
-        if ( this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None ) {
-          ScrollIndicator({
-            viewModel: this.mScrollIndicatorViewModel,
-            enabledAnimation: this.mEnabledScrollIndicatorAnimation,
+      if ( this.items.length > 0 ) {
+        Stack({ alignContent: Alignment.TopStart }) {
+          if ( this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None ) {
+            ScrollIndicator({
+              viewModel: this.mScrollIndicatorViewModel,
+              enabledAnimation: this.mEnabledScrollIndicatorAnimation,
+            })
+          }
+
+          TabBarLayout({
+            items: this.items,
+            state: this.state,
+            itemBuilder: this.itemBuilder,
+            onItemClick: this.onItemClick,
+            onItemAreaChange: (index: number) => {
+              if ( this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None && index == this.state.currentIndex || index == this.state.previousIndex ) {
+                const info = this.mTabBarLayoutManager.getInfo(this.state.currentIndex);
+                if ( info ) {
+                  this.mScrollIndicatorViewModel.updatePositionTo(info, this.mLayoutHeight);
+                }
+              }
+
+              this.scheduleUpdatePositions();
+            },
+            layoutManager: this.mTabBarLayoutManager,
+            shouldMeasureItemContentSize: this.mShouldMeasureItemContentSize,
+            itemDistribution: this.mItemDistribution,
+            itemSpacing: this.mItemSpacing,
+            contentStartOffset: this.mContentStartOffset,
+            contentEndOffset: this.mContentEndOffset,
+          })
+          .onAreaChange((oldArea, newArea) => {
+            if ( oldArea.width != newArea.width ) {
+              this.mContentWidth = newArea.width as number;
+              this.scheduleUpdatePositions();
+            }
           })
         }
-
-        TabBarLayout({
-          items: this.items,
-          state: this.state,
-          itemBuilder: this.itemBuilder,
-          onItemClick: this.onItemClick,
-          onItemAreaChange: (index: number) => {
-            if ( this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None && index == this.state.currentIndex || index == this.state.previousIndex ) {
-              const info = this.mTabBarLayoutManager.getInfo(this.state.currentIndex);
-              if ( info ) {
-                this.mScrollIndicatorViewModel.updatePositionTo(info, this.mLayoutHeight);
-              }
-            }
-
-            this.scheduleUpdatePositions();
-          },
-          layoutManager: this.mTabBarLayoutManager,
-          shouldMeasureItemContentSize: this.mShouldMeasureItemContentSize,
-          itemDistribution: this.mItemDistribution,
-          itemSpacing: this.mItemSpacing,
-          contentStartOffset: this.mContentStartOffset,
-          contentEndOffset: this.mContentEndOffset,
-        })
-        .onAreaChange((oldArea, newArea) => {
-          if ( oldArea.width != newArea.width ) {
-            this.mContentWidth = newArea.width as number;
-            this.scheduleUpdatePositions();
-          }
-        })
       }
     }
     .scrollable(ScrollDirection.Horizontal)
