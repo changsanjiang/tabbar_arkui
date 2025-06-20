@@ -1,0 +1,11 @@
+{
+  "module": {
+    "name": "tabbar",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet",
+      "2in1"
+    ]
+  }
+}

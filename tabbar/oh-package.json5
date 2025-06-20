@@ -1,0 +1,16 @@
+{
+  "name": "@sj/tabbar",
+  "version": "1.0.0",
+  "description": "`TabBar` 是一个标签栏组件，适用于页面导航或选项切换功能。",
+  "main": "Index.ets",
+  "author": "csj",
+  "license": "MIT",
+  "repository": "https://gitee.com/changsanjiang/tabbar_harmony_os.git",
+  "homepage": "https://gitee.com/changsanjiang/tabbar_harmony_os",
+  "keywords": [
+    "tabbar",
+    "tab bar",
+    "tablayout",
+    "tab layout"
+  ]
+}
