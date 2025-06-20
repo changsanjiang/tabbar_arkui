@@ -5,8 +5,8 @@
   "main": "Index.ets",
   "author": "csj",
   "license": "MIT",
-  "repository": "https://gitee.com/changsanjiang/tabbar_harmony_os.git",
-  "homepage": "https://gitee.com/changsanjiang/tabbar_harmony_os",
+  "repository": "https://gitee.com/changsanjiang/tabbar_arkui.git",
+  "homepage": "https://gitee.com/changsanjiang/tabbar_arkui",
   "keywords": [
     "tabbar",
     "tab bar",
