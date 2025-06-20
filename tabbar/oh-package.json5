@@ -12,5 +12,6 @@
     "tab bar",
     "tablayout",
     "tab layout"
-  ]
+  ],
+  "dependencies": {}
 }
