@@ -22,29 +22,46 @@ export enum TabBarScrollIndicatorSizeMode {
 }
 
 export interface TabBarScrollIndicatorOptions {
-  readonly sizeMode?: TabBarScrollIndicatorSizeMode; // 默认值: TabBarScrollIndicatorSizeMode.SpecifiedSize; 使用指定的大小;
-  readonly width?: number;          // 默认值: 12.0;
-  readonly height?: number;         // 默认值: 3.0;
-  readonly color?: ResourceColor;   // 默认值: 0x121212;
-  readonly align?: VerticalAlign;   // 默认值: VerticalAlign.Bottom;
-  readonly bottomMargin?: number;   // 默认值: 5.0; 仅在 align === VerticalAlign.Bottom 时生效;
-  readonly extraWidth?: number; // 默认值: 0.0; 在 width 的基础上增加的宽度; 滚动条最终布局的宽度等于: layoutWidth = width + extraWidth;
-  readonly extraHeight?: number;// 默认值: 0.0; 在 height 的基础上增加的高度; 滚动条最终布局的高度等于: layoutHeight = height + extraHeight;
+  /** 指示条宽度模式; 默认值: TabBarScrollIndicatorSizeMode.SpecifiedSize, 使用指定的大小; */
+  readonly sizeMode?: TabBarScrollIndicatorSizeMode;
+  /** 指示条宽度; 默认值: 12.0; */
+  readonly width?: number;
+  /** 指示条高度; 默认值: 3.0; */
+  readonly height?: number;
+  /** 指示条颜色; 默认值: 0x121212; */
+  readonly color?: ResourceColor;
+  /** 指示条垂直方向对齐方式; 默认值: VerticalAlign.Bottom; */
+  readonly align?: VerticalAlign;
+  /** 底部间隔; 默认值: 5.0; 仅在 align === VerticalAlign.Bottom 时生效; */
+  readonly bottomMargin?: number;
+  /** 额外增加的宽度; 默认值: 0.0; 在 width 的基础上增加的宽度; 滚动条最终布局的宽度等于: layoutWidth = width + extraWidth; */
+  readonly extraWidth?: number;
+  /** 额外增加的高度; 默认值: 0.0; 在 height 的基础上增加的高度; 滚动条最终布局的高度等于: layoutHeight = height + extraHeight; */
+  readonly extraHeight?: number;
 }
 
 export enum TabBarScrollIndicatorStyle {
-  None,     // 不显示
-  Rounded,  // 圆角/胶囊样式
+  /** 不显示指示条; */
+  None,
+  /** 圆角/胶囊样式; */
+  Rounded,
 }
 
 export interface TabBarOptions {
-  readonly barHeight?: Length; // 默认值: 44.0;
-  readonly itemDistribution?: TabBarItemDistribution; // 默认值: TabBarItemDistribution.EqualSpacing; item 排列方式;
-  readonly itemSpacing?: number; // 默认值: 12.0; item 之间的间隔;
-  readonly scrollIndicatorStyle?: TabBarScrollIndicatorStyle; // 默认值: TabBarScrollIndicatorStyle.Rounded; 默认显示滚动条;
+  /** TabBar 的整体高度; 默认值: 44.0; */
+  readonly barHeight?: Length;
+  /** item 排列方式; 默认值: TabBarItemDistribution.EqualSpacing; */
+  readonly itemDistribution?: TabBarItemDistribution;
+  /** item 之间的间隔; 默认值: 12.0; */
+  readonly itemSpacing?: number;
+  /** 指示条样式; 默认值: TabBarScrollIndicatorStyle.Rounded, 默认圆角/胶囊样式; */
+  readonly scrollIndicatorStyle?: TabBarScrollIndicatorStyle;
+  /** 指示条配置项; */
   readonly scrollIndicatorOptions?: TabBarScrollIndicatorOptions;
-  readonly contentStartOffset?: number; // 默认值: 12.0; 起始内容偏移;
-  readonly contentEndOffset?: number; // 默认值: 12.0; 尾部偏移;
+  /** 内容起始边距; 默认值: 12.0; */
+  readonly contentStartOffset?: number;
+  /** 内容结束边距; 默认值: 12.0; */
+  readonly contentEndOffset?: number;
 }
 
 export interface TabBarItem {
@@ -56,8 +73,11 @@ export class TabBarState {
   @Trace private mCurrentIndex: number = 0;
   private mPreviousIndex: number = 0;
 
-  // @Trace
-  // 当前选中的 item 的索引;
+  /**
+   * @Trace
+   *
+   * 当前选中的 item 的索引;
+   * */
   get currentIndex(): number {
     return this.mCurrentIndex;
   }

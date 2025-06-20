@@ -12,7 +12,7 @@
 
 ## ✅ 示例效果
 
-![](./src/main/resources/base/media/snapshot.jpg)
+![](tabbar/snapshot.jpg)
 
 ---
 
