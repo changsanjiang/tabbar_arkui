@@ -1,7 +1,7 @@
 {
   "name": "@sj/tabbar",
   "version": "1.0.0",
-  "description": "`TabBar` 是一个标签栏组件，适用于页面导航或选项切换功能。",
+  "description": "一个标签栏组件，适用于页面频道或选项切换等场景。",
   "main": "Index.ets",
   "author": "csj",
   "license": "MIT",
