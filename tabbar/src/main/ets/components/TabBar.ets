@@ -68,35 +68,20 @@ export interface TabBarItem {
 
 }
 
-@ObservedV2
-export class TabBarState {
-  @Trace private mCurrentIndex: number = 0;
-  private mPreviousIndex: number = 0;
-
+export interface TabBarState {
   /**
    * @Trace
    *
    * 当前选中的 item 的索引;
    * */
-  get currentIndex(): number {
-    return this.mCurrentIndex;
-  }
-
-  set currentIndex(newIndex: number) {
-    this.mPreviousIndex = this.mCurrentIndex;
-    this.mCurrentIndex = newIndex;
-  }
-
-  get previousIndex(): number {
-    return this.mPreviousIndex;
-  }
+  readonly currentIndex: number;
 }
 
 @ComponentV2
 export struct TabBar {
   @Param options?: TabBarOptions = undefined;
   @Require @Param items: TabBarItem[];
-  @Require @Param state: TabBarState;
+  @Require @Param currentIndex: number;
   @BuilderParam itemBuilder: (index: number, item: TabBarItem, state: TabBarState) => void;
   @Event onItemClick: (index: number, item: TabBarItem, state: TabBarState) => void;
 
@@ -113,6 +98,7 @@ export struct TabBar {
   private mLayoutHeight: number = 0.0;
   private mContentWidth: number = 0.0;
   private mScroller = new Scroller();
+  private mState = new TabBarStateImpl();
   @Local private mEnabledScrollIndicatorAnimation: boolean = false;
 
   aboutToAppear(): void {
@@ -124,6 +110,7 @@ export struct TabBar {
     this.mItemSpacing = this.options?.itemSpacing ?? this.mItemSpacing;
     this.mContentStartOffset = this.options?.contentStartOffset ?? this.mContentStartOffset;
     this.mContentEndOffset = this.options?.contentEndOffset ?? this.mContentEndOffset;
+    this.mState.currentIndex = this.currentIndex;
   }
 
   build() {
@@ -139,12 +126,12 @@ export struct TabBar {
 
           TabBarLayout({
             items: this.items,
-            state: this.state,
+            state: this.mState,
             itemBuilder: this.itemBuilder,
             onItemClick: this.onItemClick,
             onItemAreaChange: (index: number) => {
-              if ( this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None && index == this.state.currentIndex || index == this.state.previousIndex ) {
-                const info = this.mTabBarLayoutManager.getInfo(this.state.currentIndex);
+              if ( this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None && index == this.mState.currentIndex || index == this.mState.previousIndex ) {
+                const info = this.mTabBarLayoutManager.getInfo(this.mState.currentIndex);
                 if ( info ) {
                   this.mScrollIndicatorViewModel.updatePositionTo(info, this.mLayoutHeight);
                 }
@@ -186,8 +173,9 @@ export struct TabBar {
     })
   }
 
-  @Monitor('state.currentIndex')
-  private onIndexChanged(_: IMonitor) {
+  @Monitor('currentIndex')
+  private onIndexChanged(m: IMonitor) {
+    this.mState.currentIndex = m.value<number>()?.now ?? 0;
     this.scheduleUpdatePositions();
   }
 
@@ -202,7 +190,7 @@ export struct TabBar {
       return;
     }
 
-    const info = this.mTabBarLayoutManager.getInfo(this.state.currentIndex);
+    const info = this.mTabBarLayoutManager.getInfo(this.mState.currentIndex);
     if ( info ) {
       if ( this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None ) {
         this.mScrollIndicatorViewModel.updatePositionTo(info, this.mLayoutHeight);
@@ -296,6 +284,30 @@ struct ScrollIndicator {
       .backgroundColor(this.viewModel.color)
       .offset({ left: this.viewModel.offsetX, top: this.viewModel.offsetY })
       .animation(this.enabledAnimation ? { curve: 'linear', duration: 150 } : undefined)
+  }
+}
+
+@ObservedV2
+class TabBarStateImpl implements TabBarState {
+  @Trace private mCurrentIndex: number = 0;
+  private mPreviousIndex: number = 0;
+
+  /**
+   * @Trace
+   *
+   * 当前选中的 item 的索引;
+   * */
+  get currentIndex(): number {
+    return this.mCurrentIndex;
+  }
+
+  set currentIndex(newIndex: number) {
+    this.mPreviousIndex = this.mCurrentIndex;
+    this.mCurrentIndex = newIndex;
+  }
+
+  get previousIndex(): number {
+    return this.mPreviousIndex;
   }
 }
 

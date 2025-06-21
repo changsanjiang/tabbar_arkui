@@ -1,5 +1,28 @@
 import { TabBar, TabBarItem, TabBarItemDistribution, TabBarScrollIndicatorSizeMode, TabBarState } from '@sj/tabbar';
 
+@Entry
+@ComponentV2
+struct Index {
+  build() {
+    Scroll() {
+      Column({ space: 20 }) {
+        TextTabBarDemo()
+
+        ImageAndTextTabBarDemo()
+
+        TabBarScrollIndicatorDemo()
+
+        TabBarItemDistributionDemo()
+
+        ModifyingTabBarItems()
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(0xEFEFEF)
+  }
+}
+
 class TextTabBarItem implements TabBarItem {
   text: string;
 
@@ -47,35 +70,33 @@ function TabBarItemBuilder(index: number, item: TabBarItem, state: TabBarState) 
 
 @ComponentV2
 struct TextTabBarDemo {
-  private mState: TabBarState = new TabBarState();
-
-  private mTabBarItems: TabBarItem[] = [
+  @Local private mTabBarItems: TabBarItem[] = [
     new TextTabBarItem('最新'),
     new TextTabBarItem('最热'),
     new TextTabBarItem('小桥流水'),
     new TextTabBarItem('古诗词')
   ];
-
-  aboutToAppear(): void {
-    this.mState.currentIndex = 2; // 默认选中索引 2 的 item;
-  }
+  @Local private mCurrentIndex: number = 2; // 可以设置默认索引位置;
 
   build() {
-    TabBar({
-      items: this.mTabBarItems,
-      itemBuilder: TabBarItemBuilder,
-      state: this.mState,
-      onItemClick: (index, item) => {
-        this.mState.currentIndex = index;
-      }
-    })
+    Column() {
+      Text(`TextTabBarDemo`);
+
+      TabBar({
+        items: this.mTabBarItems,
+        itemBuilder: TabBarItemBuilder,
+        currentIndex: this.mCurrentIndex,
+        onItemClick: (index) => {
+          this.mCurrentIndex = index;
+        }
+      })
+    }
+    .backgroundColor(0xFFFFFF)
   }
 }
 
 @ComponentV2
 struct ImageAndTextTabBarDemo {
-  private mState: TabBarState = new TabBarState();
-
   private mTabBarItems = [
     new TextTabBarItem('最新'),
     new TextTabBarItem('小桥流水'),
@@ -92,6 +113,8 @@ struct ImageAndTextTabBarDemo {
     new ImageTabBarItem($r('app.media.tab_img_2'), 194.0 / 95.0 * 25.0, 25.0),
   ];
 
+  @Local private mCurrentIndex: number = 0;
+
   build() {
     Column() {
       Text(`ImageAndTextTabBarDemo`);
@@ -99,26 +122,27 @@ struct ImageAndTextTabBarDemo {
       TabBar({
         items: this.mTabBarItems,
         itemBuilder: TabBarItemBuilder,
-        state: this.mState,
-        onItemClick: (index, item) => {
-          this.mState.currentIndex = index;
+        currentIndex: this.mCurrentIndex,
+        onItemClick: (index) => {
+          this.mCurrentIndex = index;
         }
       })
     }
+    .backgroundColor(0xFFFFFF)
   }
 }
 
 // 滚动条demo1
 @ComponentV2
 struct TabBarScrollIndicatorDemo {
-  private mState: TabBarState = new TabBarState();
-
   private mTabBarItems = [
     new TextTabBarItem('最新'),
     new TextTabBarItem('最热'),
     new TextTabBarItem('小桥流水人家'),
     new TextTabBarItem('古诗词')
   ];
+
+  @Local private mCurrentIndex: number = 0;
 
   build() {
     Column() {
@@ -127,9 +151,9 @@ struct TabBarScrollIndicatorDemo {
       TabBar({
         items: this.mTabBarItems,
         itemBuilder: TabBarItemBuilder,
-        state: this.mState,
+        currentIndex: this.mCurrentIndex,
         onItemClick: (index, item) => {
-          this.mState.currentIndex = index;
+          this.mCurrentIndex = index;
         },
 
         // 配置项
@@ -146,19 +170,20 @@ struct TabBarScrollIndicatorDemo {
         }
       })
     }
+    .backgroundColor(0xFFFFFF)
   }
 }
 
 @ComponentV2
 struct TabBarItemDistributionDemo {
-  private mState: TabBarState = new TabBarState();
-
   private mTabBarItems = [
     new TextTabBarItem('最新'),
     new TextTabBarItem('最热'),
     new TextTabBarItem('小桥'),
     new TextTabBarItem('古诗词')
   ];
+
+  @Local private mCurrentIndex: number = 0;
 
   build() {
     Column() {
@@ -167,9 +192,9 @@ struct TabBarItemDistributionDemo {
       TabBar({
         items: this.mTabBarItems,
         itemBuilder: TabBarItemBuilder,
-        state: this.mState,
+        currentIndex: this.mCurrentIndex,
         onItemClick: (index, item) => {
-          this.mState.currentIndex = index;
+          this.mCurrentIndex = index;
         },
         // 配置项
         options: {
@@ -177,24 +202,154 @@ struct TabBarItemDistributionDemo {
         }
       })
     }
+    .backgroundColor(0xFFFFFF)
   }
 }
 
+/** 管理 items 和 当前索引;
+ *
+ * 删除项目或插入新项目时会维护当前索引;
+ * */
+@ObservedV2
+class TabBarItemManager {
+  @Trace private mItems: TabBarItem[];
+  @Trace private mCurrentIndex: number;
 
-@Entry
-@ComponentV2
-struct Index {
-  build() {
-    Column({ space: 25 }) {
-      TextTabBarDemo()
+  constructor(items: TabBarItem[], currentIndex: number = 0) {
+    this.mItems = items;
+    this.mCurrentIndex = currentIndex;
+  }
 
-      ImageAndTextTabBarDemo()
+  /** @Trace
+   *
+   * 当前选中的 item 的索引;
+   * */
+  get currentIndex(): number { return this.mCurrentIndex; }
 
-      TabBarScrollIndicatorDemo()
+  set currentIndex(newIndex: number) { this.mCurrentIndex = newIndex; }
 
-      TabBarItemDistributionDemo()
+  /** @Trace
+   *
+   * 当前的 items;
+   * */
+  get items(): TabBarItem[] { return this.mItems; }
+
+  /** 获取当前的items的数量; */
+  get length(): number { return this.mItems.length; }
+
+  setItems(newItems: TabBarItem[], currentIndex: number = 0) {
+    this.mItems = newItems;
+    this.mCurrentIndex = currentIndex;
+  }
+
+  addItem(item: TabBarItem) {
+    this.mItems.push(item);
+  }
+
+  addItems(items: TabBarItem[]) {
+    this.mItems.push(...items);
+  }
+
+  /** 删除指定位置的 item; */
+  deleteItem(index: number): boolean {
+    if ( index >= this.mItems.length ) {
+      return false;
     }
-    .width('100%')
-    .height('100%')
+
+    this.mItems.splice(index, 1);
+
+    // 需维护好 index
+    // 如果数组为空, 则将 index 重置为 0;
+    if ( this.mItems.length == 0 ) {
+      this.mCurrentIndex = 0;
+      return true;
+    }
+
+    // 如果删除的是前面的 item, currentIndex 需 - 1;
+    if ( index < this.mCurrentIndex || (index == this.mCurrentIndex && index == this.mItems.length) ) {
+      this.mCurrentIndex -= 1;
+    }
+    return true;
+  }
+
+  /** 在指定的位置插入 item; */
+  insertItem(index: number, item: TabBarItem): boolean {
+    if ( index > this.mItems.length ) {
+      return false;
+    }
+
+    this.mItems.splice(index, 0, item);
+
+    // 需维护好 index
+    // 如果数组之前为空, 则将 index 置为 0;
+    if ( this.mItems.length == 1 ) {
+      this.mCurrentIndex = 0;
+      return true;
+    }
+
+    // 如果在前面插入了新的 item, currentIndex 需 + 1;
+    if ( index <= this.mCurrentIndex ) {
+      this.mCurrentIndex += 1;
+    }
+    return true;
+  }
+}
+
+/// 修改数组
+@ComponentV2
+struct ModifyingTabBarItems {
+  private mItemManager: TabBarItemManager = new TabBarItemManager([
+    new TextTabBarItem('最新'),
+    new TextTabBarItem('最热'),
+    new TextTabBarItem('小桥'),
+    new TextTabBarItem('古诗词')
+  ]);
+
+  build() {
+    Column() {
+      Text(`ModifyingTabBarItems`)
+
+      Row({ space: 20 }) {
+        Text('添加')
+          .textAlign(TextAlign.Center)
+          .height('100%')
+          .borderWidth(1)
+          .borderColor(0x121212)
+          .onClick(() => {
+            this.mItemManager.addItem(new TextTabBarItem(`Tab_${this.mItemManager.length}`));
+          })
+
+        Text(`删除`)
+          .textAlign(TextAlign.Center)
+          .height('100%')
+          .borderWidth(1)
+          .borderColor(0x121212)
+          .onClick(() => {
+            const randomIndex = Math.floor((Math.random() * 100)) % this.mItemManager.length;
+            this.mItemManager.deleteItem(randomIndex);
+          })
+
+        Text(`随机插入`)
+          .textAlign(TextAlign.Center)
+          .height('100%')
+          .borderWidth(1)
+          .borderColor(0x121212)
+          .onClick(() => {
+            const randomIndex = Math.floor((Math.random() * 100)) % (this.mItemManager.length + 1);
+            this.mItemManager.insertItem(randomIndex, new TextTabBarItem(`R_${this.mItemManager.length}`))
+          })
+      }
+      .height(44)
+
+      TabBar({
+        items: this.mItemManager.items,
+        itemBuilder: TabBarItemBuilder,
+        currentIndex: this.mItemManager.currentIndex,
+        onItemClick: (index, item) => {
+          this.mItemManager.currentIndex = index;
+        },
+      })
+    }
+    .backgroundColor(0xFFFFFF)
   }
 }
