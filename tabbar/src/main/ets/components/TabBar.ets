@@ -146,6 +146,7 @@ export struct TabBar {
             contentStartOffset: this.mContentStartOffset,
             contentEndOffset: this.mContentEndOffset,
           })
+          .constraintSize({ minWidth: '100%' })
           .onAreaChange((oldArea, newArea) => {
             if ( oldArea.width != newArea.width ) {
               this.mContentWidth = newArea.width as number;
@@ -155,6 +156,7 @@ export struct TabBar {
         }
       }
     }
+    .align(Alignment.Start)
     .scrollable(ScrollDirection.Horizontal)
     .scrollBar(BarState.Off)
     .width('100%')
@@ -349,7 +351,7 @@ class TabBarLayoutManager {
     if ( children.length == 0 ) {
       this.mInfos = [];
       return {
-        width: selfWidth,
+        width: 0,
         height: selfHeight,
       };
     }
@@ -387,10 +389,10 @@ class TabBarLayoutManager {
         });
 
         const lastInfo = childLayoutInfos[children.length - 1];
-        const resultWidth = lastInfo.x + lastInfo.layoutSize.width + contentEndOffset;
+        resultSelfWidth = lastInfo.x + lastInfo.layoutSize.width + contentEndOffset;
 
         // 内容量不够滑动时, 使用自适应等间距分布撑满父布局;
-        if ( itemDistribution === TabBarItemDistribution.AutoAdaptive && resultWidth < selfWidth ) {
+        if ( itemDistribution === TabBarItemDistribution.AutoAdaptive && resultSelfWidth < selfWidth ) {
           resultSelfWidth = selfWidth;
           const allChildrenSize = childLayoutInfos.reduce((prev, info) => prev + info.layoutSize.width, 0);
 
@@ -406,9 +408,6 @@ class TabBarLayoutManager {
             info.x = prevX;
             prevX += info.layoutSize.width + resultItemSpacing;
           });
-        }
-        else {
-          resultSelfWidth = Math.max(selfWidth, resultWidth);
         }
         this.mInfos = childLayoutInfos;
         break;
