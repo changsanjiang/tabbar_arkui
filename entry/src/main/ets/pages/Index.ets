@@ -157,17 +157,13 @@ struct TabBarScrollIndicatorDemo {
         },
 
         // 配置项
-        options: {
-          itemDistribution: TabBarItemDistribution.EqualSpacing,
-          itemSpacing: 24,
-          scrollIndicatorOptions: {
-            sizeMode: TabBarScrollIndicatorSizeMode.EqualItemContentSize,
-            align: VerticalAlign.Center,
-            color: 0xEFEFEF,
-            extraWidth: 16,
-            extraHeight: 8,
-          }
-        }
+        itemDistribution: TabBarItemDistribution.EqualSpacing,
+        itemSpacing: 24,
+        scrollIndicatorSizeMode: TabBarScrollIndicatorSizeMode.EqualItemContentSize,
+        scrollIndicatorAlign: VerticalAlign.Center,
+        scrollIndicatorColor: 0xEFEFEF,
+        scrollIndicatorExtraWidth: 16,
+        scrollIndicatorExtraHeight: 8,
       })
     }
     .backgroundColor(0xFFFFFF)
@@ -197,9 +193,7 @@ struct TabBarItemDistributionDemo {
           this.mCurrentIndex = index;
         },
         // 配置项
-        options: {
-          itemDistribution: TabBarItemDistribution.FillEqually,
-        }
+        itemDistribution: TabBarItemDistribution.FillEqually,
       })
     }
     .backgroundColor(0xFFFFFF)
@@ -305,6 +299,8 @@ struct ModifyingTabBarItems {
     new TextTabBarItem('古诗词')
   ]);
 
+  @Local private mShows: boolean = false;
+
   build() {
     Column() {
       Text(`ModifyingTabBarItems`)
@@ -316,6 +312,7 @@ struct ModifyingTabBarItems {
           .borderWidth(1)
           .borderColor(0x121212)
           .onClick(() => {
+            this.mShows = true;
             this.mItemManager.addItem(new TextTabBarItem(`Tab_${this.mItemManager.length}`));
           })
 
@@ -349,6 +346,17 @@ struct ModifyingTabBarItems {
           this.mItemManager.currentIndex = index;
         },
       })
+
+      if ( this.mShows ) {
+        TabBar({
+          items: this.mItemManager.items,
+          itemBuilder: TabBarItemBuilder,
+          currentIndex: this.mItemManager.currentIndex,
+          onItemClick: (index, item) => {
+            this.mItemManager.currentIndex = index;
+          },
+        })
+      }
     }
     .backgroundColor(0xFFFFFF)
   }

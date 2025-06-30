@@ -21,47 +21,11 @@ export enum TabBarScrollIndicatorSizeMode {
   EqualItemContentSize,
 }
 
-export interface TabBarScrollIndicatorOptions {
-  /** 指示条宽度模式; 默认值: TabBarScrollIndicatorSizeMode.SpecifiedSize, 使用指定的大小; */
-  readonly sizeMode?: TabBarScrollIndicatorSizeMode;
-  /** 指示条宽度; 默认值: 12.0; */
-  readonly width?: number;
-  /** 指示条高度; 默认值: 3.0; */
-  readonly height?: number;
-  /** 指示条颜色; 默认值: 0x121212; */
-  readonly color?: ResourceColor;
-  /** 指示条垂直方向对齐方式; 默认值: VerticalAlign.Bottom; */
-  readonly align?: VerticalAlign;
-  /** 底部间隔; 默认值: 5.0; 仅在 align === VerticalAlign.Bottom 时生效; */
-  readonly bottomMargin?: number;
-  /** 额外增加的宽度; 默认值: 0.0; 在 width 的基础上增加的宽度; 滚动条最终布局的宽度等于: layoutWidth = width + extraWidth; */
-  readonly extraWidth?: number;
-  /** 额外增加的高度; 默认值: 0.0; 在 height 的基础上增加的高度; 滚动条最终布局的高度等于: layoutHeight = height + extraHeight; */
-  readonly extraHeight?: number;
-}
-
 export enum TabBarScrollIndicatorStyle {
   /** 不显示指示条; */
   None,
   /** 圆角/胶囊样式; */
   Rounded,
-}
-
-export interface TabBarOptions {
-  /** TabBar 的整体高度; 默认值: 44.0; */
-  readonly barHeight?: Length;
-  /** item 排列方式; 默认值: TabBarItemDistribution.EqualSpacing; */
-  readonly itemDistribution?: TabBarItemDistribution;
-  /** item 之间的间隔; 默认值: 12.0; */
-  readonly itemSpacing?: number;
-  /** 指示条样式; 默认值: TabBarScrollIndicatorStyle.Rounded, 默认圆角/胶囊样式; */
-  readonly scrollIndicatorStyle?: TabBarScrollIndicatorStyle;
-  /** 指示条配置项; */
-  readonly scrollIndicatorOptions?: TabBarScrollIndicatorOptions;
-  /** 内容起始边距; 默认值: 12.0; */
-  readonly contentStartOffset?: number;
-  /** 内容结束边距; 默认值: 12.0; */
-  readonly contentEndOffset?: number;
 }
 
 export interface TabBarItem {
@@ -79,37 +43,53 @@ export interface TabBarState {
 
 @ComponentV2
 export struct TabBar {
-  @Param options?: TabBarOptions = undefined;
   @Require @Param items: TabBarItem[];
   @Require @Param currentIndex: number;
   @BuilderParam itemBuilder: (index: number, item: TabBarItem, state: TabBarState) => void;
   @Event onItemClick: (index: number, item: TabBarItem, state: TabBarState) => void;
 
+  /** TabBar 的整体高度; 默认值: 44.0; */
+  @Param barHeight: Length = 44.0;
+  /** item 排列方式; 默认值: TabBarItemDistribution.EqualSpacing; */
+  @Param itemDistribution: TabBarItemDistribution = TabBarItemDistribution.EqualSpacing;
+  /** item 之间的间隔; 默认值: 12.0; */
+  @Param itemSpacing: number = 12.0;
+  /** 指示条样式; 默认值: TabBarScrollIndicatorStyle.Rounded, 默认圆角/胶囊样式; */
+  @Param scrollIndicatorStyle: TabBarScrollIndicatorStyle = TabBarScrollIndicatorStyle.Rounded;
+  /** 指示条宽度模式; 默认值: TabBarScrollIndicatorSizeMode.SpecifiedSize, 使用指定的大小; */
+  @Param scrollIndicatorSizeMode: TabBarScrollIndicatorSizeMode = TabBarScrollIndicatorSizeMode.SpecifiedSize;
+  /** 指示条宽度; 默认值: 12.0; */
+  @Param scrollIndicatorWidth: number = 12.0;
+  /** 指示条高度; 默认值: 3.0; */
+  @Param scrollIndicatorHeight: number = 3.0;
+  /** 指示条颜色; 默认值: 0x121212; */
+  @Param scrollIndicatorColor: ResourceColor = 0x121212;
+  /** 指示条垂直方向对齐方式; 默认值: VerticalAlign.Bottom; */
+  @Param scrollIndicatorAlign: VerticalAlign = VerticalAlign.Bottom;
+  /** 底部间隔; 默认值: 5.0; 仅在 align === VerticalAlign.Bottom 时生效; */
+  @Param scrollIndicatorBottomMargin: number = 5.0;
+  /** 额外增加的宽度; 默认值: 0.0; 在 width 的基础上增加的宽度; 滚动条最终布局的宽度等于: layoutWidth = width + extraWidth; */
+  @Param scrollIndicatorExtraWidth: number = 0.0;
+  /** 额外增加的高度; 默认值: 0.0; 在 height 的基础上增加的高度; 滚动条最终布局的高度等于: layoutHeight = height + extraHeight; */
+  @Param scrollIndicatorExtraHeight: number = 0.0;
+
+  /** 内容起始边距; 默认值: 12.0; */
+  @Param contentStartOffset: number = 12.0;
+  /** 内容结束边距; 默认值: 12.0; */
+  @Param contentEndOffset: number = 12.0;
+
   private mTabBarLayoutManager = new TabBarLayoutManager();
   private mScrollIndicatorViewModel: ScrollIndicatorViewModel = new ScrollIndicatorViewModel();
-  private mScrollIndicatorStyle: TabBarScrollIndicatorStyle = TabBarScrollIndicatorStyle.Rounded;
-  private mShouldMeasureItemContentSize = false;
-  private mBarHeight: Length = 44.0;
-  private mItemDistribution: TabBarItemDistribution = TabBarItemDistribution.EqualSpacing;
-  private mItemSpacing: number = 12.0;
-  private mContentStartOffset: number = 12.0;
-  private mContentEndOffset: number = 12.0;
   private mLayoutWidth: number = 0.0;
   private mLayoutHeight: number = 0.0;
   private mContentWidth: number = 0.0;
   private mScroller = new Scroller();
   private mState = new TabBarStateImpl();
-  @Local private mEnabledScrollIndicatorAnimation: boolean = false;
+
+  @Local private mCurrentItemLayoutInfo?: TabBarItemLayoutInfo = undefined;
+  @Local private mPreviousItemLayoutInfo?: TabBarItemLayoutInfo = undefined;
 
   aboutToAppear(): void {
-    this.mScrollIndicatorStyle = this.options?.scrollIndicatorStyle ?? this.mScrollIndicatorStyle;
-    this.mScrollIndicatorViewModel.init(this.options?.scrollIndicatorOptions);
-    this.mShouldMeasureItemContentSize = this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None && this.mScrollIndicatorViewModel.sizeMode === TabBarScrollIndicatorSizeMode.EqualItemContentSize;
-    this.mBarHeight = this.options?.barHeight ?? this.mBarHeight;
-    this.mItemDistribution = this.options?.itemDistribution ?? this.mItemDistribution;
-    this.mItemSpacing = this.options?.itemSpacing ?? this.mItemSpacing;
-    this.mContentStartOffset = this.options?.contentStartOffset ?? this.mContentStartOffset;
-    this.mContentEndOffset = this.options?.contentEndOffset ?? this.mContentEndOffset;
     this.mState.currentIndex = this.currentIndex;
   }
 
@@ -117,10 +97,10 @@ export struct TabBar {
     Scroll(this.mScroller) {
       if ( this.items.length > 0 ) {
         Stack({ alignContent: Alignment.TopStart }) {
-          if ( this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None ) {
+          if ( this.scrollIndicatorStyle !== TabBarScrollIndicatorStyle.None ) {
             ScrollIndicator({
+              scrollIndicatorColor: this.scrollIndicatorColor,
               viewModel: this.mScrollIndicatorViewModel,
-              enabledAnimation: this.mEnabledScrollIndicatorAnimation,
             })
           }
 
@@ -129,30 +109,17 @@ export struct TabBar {
             state: this.mState,
             itemBuilder: this.itemBuilder,
             onItemClick: this.onItemClick,
-            onItemAreaChange: (index: number) => {
-              if ( this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None && index == this.mState.currentIndex || index == this.mState.previousIndex ) {
-                const info = this.mTabBarLayoutManager.getInfo(this.mState.currentIndex);
-                if ( info ) {
-                  this.mScrollIndicatorViewModel.updatePositionTo(info, this.mLayoutHeight);
-                }
-              }
-
-              this.scheduleUpdatePositions();
-            },
             layoutManager: this.mTabBarLayoutManager,
-            shouldMeasureItemContentSize: this.mShouldMeasureItemContentSize,
-            itemDistribution: this.mItemDistribution,
-            itemSpacing: this.mItemSpacing,
-            contentStartOffset: this.mContentStartOffset,
-            contentEndOffset: this.mContentEndOffset,
+            shouldMeasureItemContentSize: this.shouldMeasureItemContentSize,
+            itemDistribution: this.itemDistribution,
+            itemSpacing: this.itemSpacing,
+            contentStartOffset: this.contentStartOffset,
+            contentEndOffset: this.contentEndOffset,
+            onPlaceChildrenCallback: () => this.onTabBarLayoutPlaceChildren(),
+            onDetachItemCallback: () => this.onTabBarLayoutDetachItem()
           })
           .constraintSize({ minWidth: '100%' })
-          .onAreaChange((oldArea, newArea) => {
-            if ( oldArea.width != newArea.width ) {
-              this.mContentWidth = newArea.width as number;
-              this.scheduleUpdatePositions();
-            }
-          })
+          .onAreaChange((oldArea, newArea) => this.onTabBarLayoutAreaChange(oldArea, newArea))
         }
       }
     }
@@ -160,62 +127,132 @@ export struct TabBar {
     .scrollable(ScrollDirection.Horizontal)
     .scrollBar(BarState.Off)
     .width('100%')
-    .height(this.mBarHeight)
-    .onAreaChange((oldArea, newArea) => {
-      if ( oldArea.width != newArea.width || oldArea.height != newArea.height ) {
-        this.mLayoutWidth = newArea.width as number;
-        this.mLayoutHeight = newArea.height as number;
-        this.updatePositions();
-        if ( !this.mEnabledScrollIndicatorAnimation ) {
-          setTimeout(() => {
-            this.mEnabledScrollIndicatorAnimation = true;
-          });
-        }
-      }
-    })
+    .height(this.barHeight)
+    .onAreaChange((oldArea, newArea) => this.onBarAreaChange(oldArea, newArea))
   }
 
   @Monitor('currentIndex')
-  private onIndexChanged(m: IMonitor) {
-    this.mState.currentIndex = m.value<number>()?.now ?? 0;
-    this.scheduleUpdatePositions();
+  private onIndexChange() {
+    this.mState.currentIndex = this.currentIndex;
+    this.changeCurrentItemLayoutInfo(this.mTabBarLayoutManager.getInfo(this.currentIndex));
+    this.scheduleScroll();
+  }
+
+  private onBarAreaChange(oldArea: Area, newArea: Area): void {
+    if ( oldArea.width != newArea.width || oldArea.height != newArea.height ) {
+      this.mLayoutWidth = newArea.width as number;
+      this.mLayoutHeight = newArea.height as number;
+      this.updateScrollIndicatorLayout();
+      this.scheduleScroll();
+    }
+  }
+
+  private onTabBarLayoutAreaChange(oldArea: Area, newArea: Area): void {
+    if ( oldArea.width != newArea.width ) {
+      this.mContentWidth = newArea.width as number;
+      this.scheduleScroll();
+    }
+  }
+
+  private onTabBarLayoutPlaceChildren(): void {
+    this.changeCurrentItemLayoutInfo(this.mTabBarLayoutManager.getInfo(this.currentIndex));
+  }
+
+  private onTabBarLayoutDetachItem(): void {
+    if ( this.items.length == 0.0 ) this.changeCurrentItemLayoutInfo(undefined);
+  }
+
+  @Monitor('scrollIndicatorSizeMode', 'scrollIndicatorWidth', 'scrollIndicatorHeight', 'scrollIndicatorAlign', 'scrollIndicatorBottomMargin', 'scrollIndicatorExtraWidth', 'scrollIndicatorExtraHeight')
+  private onScrollIndicatorAttrsChange() {
+    this.updateScrollIndicatorLayout();
+  }
+
+  @Computed
+  private get shouldMeasureItemContentSize(): boolean {
+    return this.scrollIndicatorStyle != TabBarScrollIndicatorStyle.None && this.scrollIndicatorSizeMode == TabBarScrollIndicatorSizeMode.EqualItemContentSize;
   }
 
   private mScheduledID?: number = 0;
-  private scheduleUpdatePositions() {
-    this.cancelSchedule();
-    this.mScheduledID = setTimeout(() => this.updatePositions(), 100);
+  private scheduleScroll() {
+    this.cancelScheduledScrollTask();
+    this.mScheduledID = setTimeout(() => this.scroll(), 100);
   }
 
-  private updatePositions(): void {
+  private scroll(): void {
     if ( this.mLayoutWidth == 0.0 || this.mLayoutHeight == 0.0 || this.mContentWidth == 0.0 ) {
       return;
     }
-
     const info = this.mTabBarLayoutManager.getInfo(this.mState.currentIndex);
-    if ( info ) {
-      if ( this.mScrollIndicatorStyle !== TabBarScrollIndicatorStyle.None ) {
-        this.mScrollIndicatorViewModel.updatePositionTo(info, this.mLayoutHeight);
-      }
-
-      let offsetX = info.x + info.layoutSize.width * 0.5 - this.mLayoutWidth * 0.5;
-      const minOffsetX = 0;
-      const maxOffsetX = this.mContentWidth - this.mLayoutWidth;
-      if ( offsetX > maxOffsetX ) {
-        offsetX = maxOffsetX;
-      }
-      else if ( offsetX < minOffsetX ) {
-        offsetX = minOffsetX;
-      }
-      this.mScroller.scrollTo({ xOffset: offsetX, yOffset: 0, animation: { curve: Curve.Linear, duration: 150 } });
+    if ( !info ) {
+      return;
     }
-    this.cancelSchedule();
+    let offsetX = info.x + info.layoutSize.width * 0.5 - this.mLayoutWidth * 0.5;
+    const minOffsetX = 0;
+    const maxOffsetX = this.mContentWidth - this.mLayoutWidth;
+    if ( offsetX > maxOffsetX ) {
+      offsetX = maxOffsetX;
+    }
+    else if ( offsetX < minOffsetX ) {
+      offsetX = minOffsetX;
+    }
+    this.mScroller.scrollTo({ xOffset: offsetX, yOffset: 0, animation: { curve: Curve.Linear, duration: 150 } });
+    this.cancelScheduledScrollTask();
   }
 
-  private cancelSchedule() {
+  private cancelScheduledScrollTask() {
     if ( this.mScheduledID ) {
       clearTimeout(this.mScheduledID);
       this.mScheduledID = undefined;
+    }
+  }
+
+  private changeCurrentItemLayoutInfo(info?: TabBarItemLayoutInfo): void {
+    if (
+        this.mCurrentItemLayoutInfo?.x != info?.x ||
+        this.mCurrentItemLayoutInfo?.layoutSize.width != info?.layoutSize.width || this.mCurrentItemLayoutInfo?.layoutSize.height != info?.layoutSize.height ||
+        this.mCurrentItemLayoutInfo?.contentSize.width != info?.contentSize.width || this.mCurrentItemLayoutInfo?.contentSize.height != info?.contentSize.height
+    ) {
+      this.mPreviousItemLayoutInfo = this.mCurrentItemLayoutInfo;
+      this.mCurrentItemLayoutInfo = info;
+      this.updateScrollIndicatorLayout();
+    }
+  }
+
+  private updateScrollIndicatorLayout() {
+    const animated = this.mCurrentItemLayoutInfo != undefined && this.mPreviousItemLayoutInfo != undefined;
+
+    const info = this.mCurrentItemLayoutInfo;
+    if ( info ) {
+      if ( animated ) {
+        setTimeout(() => {
+          this.getUIContext().animateTo({ curve: 'linear', duration: 150 }, () => {
+            this.mScrollIndicatorViewModel.updateLayout(
+              info,
+              this.mLayoutHeight,
+              this.scrollIndicatorSizeMode,
+              this.scrollIndicatorAlign,
+              this.scrollIndicatorWidth,
+              this.scrollIndicatorHeight,
+              this.scrollIndicatorExtraWidth,
+              this.scrollIndicatorExtraHeight,
+              this.scrollIndicatorBottomMargin
+            );
+          });
+        })
+      }
+      else {
+        this.mScrollIndicatorViewModel.updateLayout(
+          info,
+          this.mLayoutHeight,
+          this.scrollIndicatorSizeMode,
+          this.scrollIndicatorAlign,
+          this.scrollIndicatorWidth,
+          this.scrollIndicatorHeight,
+          this.scrollIndicatorExtraWidth,
+          this.scrollIndicatorExtraHeight,
+          this.scrollIndicatorBottomMargin
+        );
+      }
     }
   }
 }
@@ -226,7 +263,8 @@ struct TabBarLayout {
   @Require @Param state: TabBarState;
   @BuilderParam itemBuilder: (index: number, item: TabBarItem, state: TabBarState) => void;
   @Event onItemClick: (index: number, item: TabBarItem, state: TabBarState) => void;
-  @Event onItemAreaChange: (index: number, item: TabBarItem, state: TabBarState) => void;
+  @Event onPlaceChildrenCallback: () => void;
+  @Event onDetachItemCallback: (index: number) => void;
 
   @Param layoutManager: TabBarLayoutManager = new TabBarLayoutManager();
   @Param shouldMeasureItemContentSize: boolean = false;
@@ -243,20 +281,11 @@ struct TabBarLayout {
         Stack() {
           this.itemBuilder(index, item, this.state)
         }
-        .onAreaChange((oldArea, newArea) => {
-          if (
-            oldArea.position.x != newArea.position.x ||
-            oldArea.position.y != newArea.position.y ||
-            oldArea.width != newArea.width ||
-            oldArea.height != newArea.height
-          ) {
-            this.onItemAreaChange(index, item, this.state);
-          }
-        })
       }
       .onClick(() => {
         this.onItemClick?.(index, item, this.state);
       })
+      .onDetach(() => this.onDetachItemCallback(index))
     })
   }
 
@@ -270,22 +299,22 @@ struct TabBarLayout {
 
   onPlaceChildren(selfLayoutInfo: GeometryInfo, children: Layoutable[], constraint: ConstraintSizeOptions): void {
     this.layoutManager.onPlaceChildren(selfLayoutInfo, children, constraint);
+    this.onPlaceChildrenCallback();
   }
 }
 
 @ComponentV2
 struct ScrollIndicator {
+  @Require @Param scrollIndicatorColor: ResourceColor;
   @Require @Param viewModel: ScrollIndicatorViewModel;
-  @Param enabledAnimation: boolean = false;
 
   build() {
     Stack()
       .width(this.viewModel.width)
       .height(this.viewModel.height)
       .borderRadius(this.viewModel.height * 0.5)
-      .backgroundColor(this.viewModel.color)
+      .backgroundColor(this.scrollIndicatorColor)
       .offset({ left: this.viewModel.offsetX, top: this.viewModel.offsetY })
-      .animation(this.enabledAnimation ? { curve: 'linear', duration: 150 } : undefined)
   }
 }
 
@@ -469,49 +498,10 @@ class TabBarLayoutManager {
 
 @ObservedV2
 class ScrollIndicatorViewModel {
-  private mSizeMode: TabBarScrollIndicatorSizeMode = TabBarScrollIndicatorSizeMode.SpecifiedSize;
-  private mColor: ResourceColor = 0x121212;
-  private mAlign: VerticalAlign = VerticalAlign.Bottom;
-  private mBottomMargin: number = 5.0;
-  private mExtraWidth: number = 0.0;
-  private mExtraHeight: number = 0.0;
-
-  @Trace private mWidth: number = 12.0;
-  @Trace private mHeight: number = 3.0;
   @Trace private mOffsetX: number = 0.0;
   @Trace private mOffsetY: number = 0.0;
-
-  init(options?: TabBarScrollIndicatorOptions) {
-    this.mSizeMode = options?.sizeMode ?? this.mSizeMode;
-    this.mColor = options?.color ?? this.mColor;
-    this.mAlign = options?.align ?? this.mAlign;
-    this.mBottomMargin = options?.bottomMargin ?? this.mBottomMargin;
-    this.mExtraWidth = options?.extraWidth ?? this.mExtraWidth;
-    this.mExtraHeight = options?.extraHeight ?? this.mExtraHeight;
-
-    this.mWidth = options?.width ?? this.mWidth;
-    this.mHeight = options?.height ?? this.mHeight;
-    this.mOffsetX = 0.0;
-    this.mOffsetY = 0.0;
-  }
-
-  get sizeMode(): TabBarScrollIndicatorSizeMode {
-    return this.mSizeMode;
-  }
-
-  get color(): ResourceColor {
-    return this.mColor;
-  }
-
-  // @Trace
-  get width(): number {
-    return this.mWidth;
-  }
-
-  // @Trace
-  get height(): number {
-    return this.mHeight;
-  }
+  @Trace private mLayoutWidth: number = 12.0;
+  @Trace private mLayoutHeight: number = 3.0;
 
   // @Trace
   get offsetX(): number {
@@ -523,25 +513,56 @@ class ScrollIndicatorViewModel {
     return this.mOffsetY;
   }
 
-  updatePositionTo(info: TabBarItemLayoutInfo, barHeight: number) {
-    if ( this.mSizeMode == TabBarScrollIndicatorSizeMode.EqualItemContentSize ) {
-      this.mWidth = info.contentSize.width + this.mExtraWidth;
-      this.mHeight = info.contentSize.height + this.mExtraHeight;
+  // @Trace
+  get width(): number {
+    return this.mLayoutWidth;
+  }
+
+  // @Trace
+  get height(): number {
+    return this.mLayoutHeight;
+  }
+
+  updateLayout(
+    info: TabBarItemLayoutInfo,
+    barHeight: number,
+    sizeMode: TabBarScrollIndicatorSizeMode,
+    align: VerticalAlign,
+    specifedWidth: number,
+    specifedHeight: number,
+    extraWidth: number,
+    extraHeight: number,
+    bottomMargin: number
+  ) {
+    let layoutWidth: number;
+    let layoutHeight: number;
+    if ( sizeMode == TabBarScrollIndicatorSizeMode.EqualItemContentSize ) {
+      layoutWidth = info.contentSize.width + extraWidth;
+      layoutHeight = info.contentSize.height + extraHeight;
+    }
+    else {
+      layoutWidth = specifedWidth + extraWidth;
+      layoutHeight = specifedHeight + extraHeight;
     }
 
-    this.mOffsetX = info.x + info.layoutSize.width * 0.5 - this.mWidth * 0.5;
-
-    switch (this.mAlign) {
+    const offsetX = info.x + info.layoutSize.width * 0.5 - layoutWidth * 0.5;
+    let offsetY = 0.0;
+    switch (align) {
       case VerticalAlign.Top:
-        this.mOffsetY = 0;
         break;
       case VerticalAlign.Center:
-        this.mOffsetY = barHeight * 0.5 - this.mHeight * 0.5;
+        offsetY = barHeight * 0.5 - layoutHeight * 0.5;
         break;
       case VerticalAlign.Bottom:
-        // mBottomMargin 仅在 align === VerticalAlign.Bottom 时生效;
-        this.mOffsetY = barHeight - this.mBottomMargin - this.mHeight;
+        // bottomMargin 仅在 align === VerticalAlign.Bottom 时生效;
+        offsetY = barHeight - bottomMargin - layoutHeight;
         break;
     }
+
+    // (xy, wh)
+    if ( offsetX != this.mOffsetX ) this.mOffsetX = offsetX;
+    if ( offsetY != this.mOffsetY ) this.mOffsetY = offsetY;
+    if ( layoutWidth != this.mLayoutWidth )  this.mLayoutWidth = layoutWidth;
+    if ( layoutHeight != this.mLayoutHeight ) this.mLayoutHeight = layoutHeight;
   }
 }
