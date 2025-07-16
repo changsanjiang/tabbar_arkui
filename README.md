@@ -65,7 +65,7 @@ struct TextTabBarDemo {
 }
 
 /// 自定义 item 数据类
-class TextTabBarItem implements TabBarItem {
+class TextTabBarItem {
   text: string;
 
   constructor(text: string) {
@@ -95,7 +95,8 @@ function TabBarItemBuilder(index: number, item: TabBarItem, state: TabBarState) 
 ## 🔄 与 Tabs 联动
 
 ```ts
-/// 与 tabs 联动
+import { TabBar, TabBarItem, TabBarState, TabBarSwipeController } from '@sj/tabbar';
+
 @ComponentV2
 struct TabsInteractionDemo {
   @Local private mTabs: TabViewModel[] = [
@@ -179,7 +180,7 @@ function TabBarItemBuilder2(index: number, item: TabBarItem, state: TabBarState)
     Text(item.title)
       .height(25)
       .textAlign(TextAlign.Center)
-      .fontSize(15 + (20 - 15) * state.getItemScaleFactor(index)) // 这里获取缩放因子: 当前尺寸 = 基础尺寸 + (最大尺寸 - 基础尺寸) * scaleFactor; 缩放因子是由 TabBarSwipeController 传递的滑动事件计算得出的;
+      .fontSize(15 + (20 - 15) * state.getItemScaleFactor(index)) // 这里获取缩放因子: 当前尺寸 = 基础尺寸 + (最大尺寸 - 基础尺寸) * scaleFactor; 缩放因子是由 TabBarSwipeController 传递的滑动事件计算得出;
       .fontWeight(FontWeight.Medium)
       .fontColor(state.currentIndex === index ? 0x121212 : 0x989898)
       .animation({ curve: 'linear', duration: 150 })
