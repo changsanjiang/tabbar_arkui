@@ -15,7 +15,7 @@
 
 ## 🖼️ 示例效果图
 
-![](snapshot.jpg)
+![](tabbar/snapshot.jpg)
 
 ---
 
