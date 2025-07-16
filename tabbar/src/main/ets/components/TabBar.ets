@@ -28,10 +28,13 @@ export enum TabBarScrollIndicatorStyle {
   Rounded,
 }
 
-export interface TabBarItem {
+/** 可以是任意对象, 对应 itemBuilder 构建参数中的 item; */
+export type TabBarItem = Object;
 
-}
+/** 可以是任意对象，对应 itemBuilder 构建参数中的 options;  */
+export type TabBarItemBuilderOptions = Object;
 
+/** 记录着当前 TabBar 的状态; */
 export interface TabBarState {
   /**
    * @Trace
@@ -39,14 +42,57 @@ export interface TabBarState {
    * 当前选中的 item 的索引;
    * */
   readonly currentIndex: number;
+
+  /**
+   * @Trace
+   *
+   * 获取指定位置的 item 的缩放因子, 取值范围为 [0.0, 1.0].
+   *
+   * TabBar 会在接收到 TabBarSwipeController 的滑动事件后, 实时更新各 item 的缩放因子.
+   *
+   * 通常用于实现缩放动画, 例如:
+   *   item 当前尺寸 = 基础尺寸 + (最大尺寸 - 基础尺寸) * scaleFactor;
+   *
+   * 随着滑动的进行:
+   *   - 当前选中的 item 的缩放因子会从 1.0 平滑过渡到 0.0;
+   *   - 将要选中的 item 的缩放因子会从 0.0 逐渐增大到 1.0.
+   *
+   * */
+  getItemScaleFactor(index: number): number;
+}
+
+/** 用于传递 tabs 的滑动事件; 实现指示条同步滑动及 item 的缩放控制; */
+export class TabBarSwipeController {
+  animationStart(index: number, targetIndex: number, event: TabsAnimationEvent, tabsWidth: number): void {
+    this._onAnimationStart?.(index, targetIndex, event, tabsWidth);
+  }
+
+  animationEnd(index: number, event: TabsAnimationEvent, tabsWidth: number): void {
+    this._onAnimationEnd?.(index, event, tabsWidth);
+  }
+
+  swipe(index: number, event: TabsAnimationEvent, tabsWidth: number): void {
+    this._onSwipeEvent?.(index, event, tabsWidth);
+  }
+
+  /** 这三个 block 请勿设置, TabBar 内部将会使用它们来监听滑动事件; */
+  _onAnimationStart?: (index: number, targetIndex: number, event: TabsAnimationEvent, tabsWidth: number) => void;
+  _onAnimationEnd?: (index: number, event: TabsAnimationEvent, tabsWidth: number) => void;
+  _onSwipeEvent?: (index: number, event: TabsAnimationEvent, tabsWidth: number) => void;
 }
 
 @ComponentV2
 export struct TabBar {
   @Require @Param items: TabBarItem[];
   @Require @Param currentIndex: number;
-  @BuilderParam itemBuilder: (index: number, item: TabBarItem, state: TabBarState) => void;
+  /** TabBarItem 的构建函数; */
+  @BuilderParam itemBuilder: (index: number, item: TabBarItem, state: TabBarState, options?: TabBarItemBuilderOptions) => void;
+  /** 为 itemBuilder 添加额外参数, 对应 itemBuilder 构建参数中的 options; */
+  @Param itemBuilderOptions?: TabBarItemBuilderOptions = undefined;
+  /** 点击 item 的回调; */
   @Event onItemClick: (index: number, item: TabBarItem, state: TabBarState) => void;
+  /** 用于传递 tabs 的滑动事件; 实现指示条同步滑动及 item 的缩放控制; */
+  @Param swipeController?: TabBarSwipeController = undefined;
 
   /** TabBar 的整体高度; 默认值: 44.0; */
   @Param barHeight: Length = 44.0;
@@ -90,7 +136,16 @@ export struct TabBar {
   @Local private mPreviousItemLayoutInfo?: TabBarItemLayoutInfo = undefined;
 
   aboutToAppear(): void {
+    if ( this.itemBuilder == undefined ) {
+      this.itemBuilder = this.PlaceholderItemBuilder;
+    }
+
     this.mState.currentIndex = this.currentIndex;
+    if ( this.swipeController ) {
+      this.swipeController._onSwipeEvent = (index: number, event: TabsAnimationEvent, tabsWidth: number) => this.onSwipeEvent(index, event, tabsWidth);
+      this.swipeController._onAnimationStart = (index: number, targetIndex: number, event: TabsAnimationEvent, tabsWidth: number) => this.onAnimationStart(index, targetIndex, event, tabsWidth);
+      this.swipeController._onAnimationEnd = (index: number, event: TabsAnimationEvent, tabsWidth: number) => this.onAnimationEnd(index, event, tabsWidth);
+    }
   }
 
   build() {
@@ -107,6 +162,7 @@ export struct TabBar {
           TabBarLayout({
             items: this.items,
             state: this.mState,
+            itemBuilderOptions: this.itemBuilderOptions,
             itemBuilder: this.itemBuilder,
             onItemClick: this.onItemClick,
             layoutManager: this.mTabBarLayoutManager,
@@ -131,9 +187,73 @@ export struct TabBar {
     .onAreaChange((oldArea, newArea) => this.onBarAreaChange(oldArea, newArea))
   }
 
+  private onAnimationStart(index: number, targetIndex: number, event: TabsAnimationEvent, tabsWidth: number): void {
+    this.mState.fromIndex = index;
+    this.mState.toIndex = index;
+    this.mState.distance = 0;
+    this.updateScrollIndicatorLayout();
+  }
+
+  private onAnimationEnd(index: number, event: TabsAnimationEvent, tabsWidth: number): void {
+    if ( this.items.length == 0 || Number.isNaN(tabsWidth) || !Number.isFinite(tabsWidth) || tabsWidth <= 0 ) {
+      return;
+    }
+
+    this.mState.fromIndex = index;
+    this.mState.toIndex = index;
+    this.mState.distance = 0;
+    this.updateScrollIndicatorLayout();
+  }
+
+  private onSwipeEvent(index: number, event: TabsAnimationEvent, tabsWidth: number): void {
+    if ( this.items.length == 0 || Number.isNaN(tabsWidth) || !Number.isFinite(tabsWidth) || tabsWidth <= 0 ) {
+      return;
+    }
+
+    const currentOffset = event.currentOffset;
+    if ( currentOffset == 0 ) {
+      return;
+    }
+
+    // 前一页 event.currentOffset > 0
+    // 后一页 event.currentOffset < 0
+    if ( index == 0 && currentOffset > 0 ) {
+      return;
+    }
+
+    if ( index == this.items.length - 1 && currentOffset < 0 ) {
+      return;
+    }
+
+    let fromIndex = 0;
+    let toIndex = 0;
+    let distance = 0.0;
+
+    // 前一页
+    if ( currentOffset > 0 ) {
+      fromIndex = index - 1;
+      toIndex = index;
+      distance = 1.0 - currentOffset / tabsWidth;
+    }
+    // 后一页
+    else {
+     fromIndex = index;
+     toIndex = index + 1;
+     distance = Math.abs(currentOffset) / tabsWidth;
+    }
+
+    this.mState.fromIndex = fromIndex;
+    this.mState.toIndex = toIndex;
+    this.mState.distance = distance;
+    this.updateScrollIndicatorLayout();
+  }
+
   @Monitor('currentIndex')
   private onIndexChange() {
     this.mState.currentIndex = this.currentIndex;
+    this.mState.fromIndex = this.currentIndex;
+    this.mState.toIndex = this.currentIndex;
+    this.mState.distance = 0.0;
     this.changeCurrentItemLayoutInfo(this.mTabBarLayoutManager.getInfo(this.currentIndex));
     this.scheduleScroll();
   }
@@ -235,7 +355,12 @@ export struct TabBar {
               this.scrollIndicatorHeight,
               this.scrollIndicatorExtraWidth,
               this.scrollIndicatorExtraHeight,
-              this.scrollIndicatorBottomMargin
+              this.scrollIndicatorBottomMargin,
+              this.mTabBarLayoutManager.getInfo(this.mState.fromIndex)!,
+              this.mTabBarLayoutManager.getInfo(this.mState.toIndex)!,
+              this.mState.fromIndex,
+              this.mState.toIndex,
+              this.mState.distance,
             );
           });
         })
@@ -250,10 +375,23 @@ export struct TabBar {
           this.scrollIndicatorHeight,
           this.scrollIndicatorExtraWidth,
           this.scrollIndicatorExtraHeight,
-          this.scrollIndicatorBottomMargin
+          this.scrollIndicatorBottomMargin,
+          this.mTabBarLayoutManager.getInfo(this.mState.fromIndex)!,
+          this.mTabBarLayoutManager.getInfo(this.mState.toIndex)!,
+          this.mState.fromIndex,
+          this.mState.toIndex,
+          this.mState.distance,
         );
       }
     }
+  }
+
+  @Builder
+  private PlaceholderItemBuilder(index: number, item: TabBarItem, state: TabBarState, options?: TabBarItemBuilderOptions) {
+    Text(`请指定 TabBar.itemBuilder 构建 item`)
+      .backgroundColor(0x000000)
+      .fontColor(0xFFFFFF)
+      .fontSize(15)
   }
 }
 
@@ -261,7 +399,8 @@ export struct TabBar {
 struct TabBarLayout {
   @Require @Param items: TabBarItem[];
   @Require @Param state: TabBarState;
-  @BuilderParam itemBuilder: (index: number, item: TabBarItem, state: TabBarState) => void;
+  @Param itemBuilderOptions?: Object = undefined;
+  @BuilderParam itemBuilder: (index: number, item: TabBarItem, state: TabBarState, options?: TabBarItemBuilderOptions) => void;
   @Event onItemClick: (index: number, item: TabBarItem, state: TabBarState) => void;
   @Event onPlaceChildrenCallback: () => void;
   @Event onDetachItemCallback: (index: number) => void;
@@ -279,7 +418,7 @@ struct TabBarLayout {
     ForEach(this.items, (item: TabBarItem, index: number) => {
       Stack({ alignContent: Alignment.Center }) {
         Stack() {
-          this.itemBuilder(index, item, this.state)
+          this.itemBuilder(index, item, this.state, this.itemBuilderOptions)
         }
       }
       .onClick(() => {
@@ -323,6 +462,10 @@ class TabBarStateImpl implements TabBarState {
   @Trace private mCurrentIndex: number = 0;
   private mPreviousIndex: number = 0;
 
+  @Trace fromIndex: number = 0;
+  @Trace toIndex: number = 0;
+  @Trace distance: number = 0;
+
   /**
    * @Trace
    *
@@ -339,6 +482,21 @@ class TabBarStateImpl implements TabBarState {
 
   get previousIndex(): number {
     return this.mPreviousIndex;
+  }
+
+  getItemScaleFactor(index: number): number {
+    if ( this.fromIndex == this.toIndex ) {
+      return index == this.mCurrentIndex ? 1.0 : 0.0;
+    }
+
+    if ( index == this.fromIndex ) {
+      return 1 - this.distance;
+    }
+
+    if ( index == this.toIndex ) {
+      return this.distance;
+    }
+    return 0.0;
   }
 }
 
@@ -532,8 +690,78 @@ class ScrollIndicatorViewModel {
     specifedHeight: number,
     extraWidth: number,
     extraHeight: number,
-    bottomMargin: number
+    bottomMargin: number,
+    fromInfo: TabBarItemLayoutInfo,
+    toInfo: TabBarItemLayoutInfo,
+    fromIndex: number,
+    toIndex: number,
+    progress: number
   ) {
+    let layoutSize: SizeResult;
+    let offsetX: number;
+    if ( fromIndex < toIndex ) {
+      const leftViewCenterX = fromInfo.x + fromInfo.layoutSize.width * 0.5;
+      const rightViewCenterX = toInfo.x + toInfo.layoutSize.width * 0.5;
+      const leftViewMinX = fromInfo.x;
+      const rightViewMaxX = toInfo.x + toInfo.layoutSize.width;
+
+      const leftSize = this.calculateIndicatorLayoutSizeBy(fromInfo, sizeMode, specifedWidth, specifedHeight, extraWidth, extraHeight);
+      const rightSize = this.calculateIndicatorLayoutSizeBy(toInfo, sizeMode, specifedWidth, specifedHeight, extraWidth, extraHeight);
+
+      const factor = 1 - Math.abs(rightSize.width - leftSize.width) / Math.max(rightSize.width, leftSize.width);
+      const distance = (rightViewMaxX - leftViewMinX) * factor;
+      let indicatorWidth = 0.0;
+      // 小于 0.5 开始变长
+      if ( progress < 0.5 ) {
+        indicatorWidth = leftSize.width * ( 1 - progress ) + rightSize.width * progress + distance * progress;
+      }
+      // 超过 0.5 开始缩小
+      else {
+        indicatorWidth = leftSize.width * ( 1 - progress ) + rightSize.width * progress + distance * ( 1 - progress);
+      }
+
+      const maxOffset = rightViewCenterX - leftViewCenterX;
+      const currOffset = leftViewCenterX + maxOffset * progress - indicatorWidth * 0.5;
+
+      layoutSize = {
+        width: indicatorWidth,
+        height: leftSize.height
+      };
+      offsetX = currOffset;
+    }
+    else {
+      layoutSize = this.calculateIndicatorLayoutSizeBy(info, sizeMode, specifedWidth, specifedHeight, extraWidth, extraHeight);
+      offsetX = info.x + info.layoutSize.width * 0.5 - layoutSize.width * 0.5;
+    }
+
+    let offsetY = 0.0;
+    switch (align) {
+      case VerticalAlign.Top:
+        break;
+      case VerticalAlign.Center:
+        offsetY = barHeight * 0.5 - layoutSize.height * 0.5;
+        break;
+      case VerticalAlign.Bottom:
+        // bottomMargin 仅在 align === VerticalAlign.Bottom 时生效;
+        offsetY = barHeight - bottomMargin - layoutSize.height;
+        break;
+    }
+
+    // (xy, wh)
+    if ( offsetX != this.mOffsetX ) this.mOffsetX = offsetX;
+    if ( offsetY != this.mOffsetY ) this.mOffsetY = offsetY;
+    if ( layoutSize.width != this.mLayoutWidth )  this.mLayoutWidth = layoutSize.width;
+    if ( layoutSize.height != this.mLayoutHeight ) this.mLayoutHeight = layoutSize.height;
+  }
+
+  private calculateIndicatorLayoutSizeBy(
+    info: TabBarItemLayoutInfo,
+    sizeMode: TabBarScrollIndicatorSizeMode,
+    specifedWidth: number,
+    specifedHeight: number,
+    extraWidth: number,
+    extraHeight: number
+  ): SizeResult {
     let layoutWidth: number;
     let layoutHeight: number;
     if ( sizeMode == TabBarScrollIndicatorSizeMode.EqualItemContentSize ) {
@@ -544,25 +772,9 @@ class ScrollIndicatorViewModel {
       layoutWidth = specifedWidth + extraWidth;
       layoutHeight = specifedHeight + extraHeight;
     }
-
-    const offsetX = info.x + info.layoutSize.width * 0.5 - layoutWidth * 0.5;
-    let offsetY = 0.0;
-    switch (align) {
-      case VerticalAlign.Top:
-        break;
-      case VerticalAlign.Center:
-        offsetY = barHeight * 0.5 - layoutHeight * 0.5;
-        break;
-      case VerticalAlign.Bottom:
-        // bottomMargin 仅在 align === VerticalAlign.Bottom 时生效;
-        offsetY = barHeight - bottomMargin - layoutHeight;
-        break;
+    return {
+      width: layoutWidth,
+      height: layoutHeight,
     }
-
-    // (xy, wh)
-    if ( offsetX != this.mOffsetX ) this.mOffsetX = offsetX;
-    if ( offsetY != this.mOffsetY ) this.mOffsetY = offsetY;
-    if ( layoutWidth != this.mLayoutWidth )  this.mLayoutWidth = layoutWidth;
-    if ( layoutHeight != this.mLayoutHeight ) this.mLayoutHeight = layoutHeight;
   }
 }

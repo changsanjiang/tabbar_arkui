@@ -1,11 +1,12 @@
-import { TabBar, TabBarItem, TabBarItemDistribution, TabBarScrollIndicatorSizeMode, TabBarState } from '@sj/tabbar';
+import { TabBar, TabBarItem, TabBarItemDistribution, TabBarScrollIndicatorSizeMode, TabBarState,
+  TabBarSwipeController } from '@sj/tabbar';
 
 @Entry
 @ComponentV2
 struct Index {
   build() {
     Scroll() {
-      Column({ space: 20 }) {
+      Column({ space: 12 }) {
         TextTabBarDemo()
 
         ImageAndTextTabBarDemo()
@@ -15,6 +16,10 @@ struct Index {
         TabBarItemDistributionDemo()
 
         ModifyingTabBarItems()
+
+        TabsInteractionDemo()
+          .width('100%')
+          .layoutWeight(1)
       }
     }
     .width('100%')
@@ -23,7 +28,7 @@ struct Index {
   }
 }
 
-class TextTabBarItem implements TabBarItem {
+class TextTabBarItem {
   text: string;
 
   constructor(text: string) {
@@ -359,5 +364,99 @@ struct ModifyingTabBarItems {
       }
     }
     .backgroundColor(0xFFFFFF)
+  }
+}
+
+/// 与 tabs 联动
+@ComponentV2
+struct TabsInteractionDemo {
+  @Local private mTabs: TabViewModel[] = [
+    new TabViewModel("最新", "#00FF00"),
+    new TabViewModel("最热", "#00FFFF"),
+    new TabViewModel("小桥流水", "#FFFF00"),
+    new TabViewModel("古诗词", "#00FF0F"),
+    new TabViewModel("这是一条震古烁今的文本", "#0FF000")
+  ];
+
+  private mInitialIndex = 2; // Tabs的初始索引; 可以设置默认索引位置, 这里修改为 2;
+  @Local private mCurrentIndex: number = 2; // 可以设置默认索引位置, 这里修改为 2;
+
+  private mTabsController: TabsController = new TabsController();
+  private mTabsWidth: number = 0; // 记录 tabs 的宽度, TabBarSwipeController 需要;
+
+  private mTabBarSwipeController = new TabBarSwipeController(); // 用于传递 tabs 的滑动事件; 实现指示条同步滑动及 item 的缩放控制;
+
+  build() {
+    Column() {
+      Text(`TabsInteractionDemo(与 Tabs 联动)\n请左右滑动 Tab`)
+        .textAlign(TextAlign.Center);
+
+      TabBar({
+        items: this.mTabs,
+        currentIndex: this.mCurrentIndex,
+        itemBuilder: TabBarItemBuilder2, // 传递 TabBarItemBuilder2, 用于构建自定义的 item 布局;
+        swipeController: this.mTabBarSwipeController, // 传递 mTabBarSwipeController, 实现指示条同步滑动及 item 的缩放控制;
+        onItemClick: (index) => {
+          this.mCurrentIndex = index;
+          this.mTabsController.changeIndex(index);
+        }
+      })
+
+      Tabs({
+        barPosition: BarPosition.Start,
+        index: this.mInitialIndex,
+        controller: this.mTabsController,
+      }){
+        ForEach(this.mTabs, (item: TabViewModel) => {
+          TabContent()
+          .backgroundColor(item.pageBackgroundColor)
+          .width('100%')
+          .height('100%')
+        })
+      }
+      .vertical(false)
+      .barHeight(0)
+      .width('100%')
+      .layoutWeight(1)
+      .onAreaChange((_, newArea) => {
+        this.mTabsWidth = newArea.width as number; // 记录 tabs 的布局宽度; TabBarSwipeController 需要;
+      })
+      .onAnimationStart((index, targetIndex, event) => {
+        this.mCurrentIndex = targetIndex
+        this.mTabBarSwipeController.animationStart(index, targetIndex, event, this.mTabsWidth); // 传递 tabs 滑动事件
+      })
+      .onAnimationEnd((index, event) => {
+        this.mTabBarSwipeController.animationEnd(index, event, this.mTabsWidth); // 传递 tabs 滑动事件
+      })
+      .onGestureSwipe((index, event) => {
+        this.mTabBarSwipeController.swipe(index, event, this.mTabsWidth); // 传递 tabs 滑动事件
+      })
+    }
+    .backgroundColor(0xFFFFFF)
+    .width('100%')
+    .height('100%')
+  }
+}
+
+class TabViewModel {
+  readonly title: string;
+  readonly pageBackgroundColor: string;
+
+  constructor(title: string, pageBackgroundColor: string) {
+    this.title = title;
+    this.pageBackgroundColor = pageBackgroundColor;
+  }
+}
+
+@Builder
+function TabBarItemBuilder2(index: number, item: TabBarItem, state: TabBarState) {
+  if ( item instanceof TabViewModel ) {
+    Text(item.title)
+      .height(25)
+      .textAlign(TextAlign.Center)
+      .fontSize(15 + (20 - 15) * state.getItemScaleFactor(index)) // 这里获取缩放因子: 当前尺寸 = 基础尺寸 + (最大尺寸 - 基础尺寸) * scaleFactor; 缩放因子是由 TabBarSwipeController 传递的滑动事件计算得出的;
+      .fontWeight(FontWeight.Medium)
+      .fontColor(state.currentIndex === index ? 0x121212 : 0x989898)
+      .animation({ curve: 'linear', duration: 150 })
   }
 }
