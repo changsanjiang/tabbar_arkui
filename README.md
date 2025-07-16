@@ -183,7 +183,7 @@ function TabBarItemBuilder2(index: number, item: TabBarItem, state: TabBarState)
       .fontSize(15 + (20 - 15) * state.getItemScaleFactor(index)) // 这里获取缩放因子: 当前尺寸 = 基础尺寸 + (最大尺寸 - 基础尺寸) * scaleFactor; 缩放因子是由 TabBarSwipeController 传递的滑动事件计算得出;
       .fontWeight(FontWeight.Medium)
       .fontColor(state.currentIndex === index ? 0x121212 : 0x989898)
-      .animation({ curve: 'linear', duration: 150 })
+      .animation(!state.isSwiping ? { duration: 150.0, curve: Curve.Linear } : undefined) // 这里有个细节就是当进行 tabs 的滑动交互(state.isSwiping)时不开启动画, 其他时候启用属性动画;
   }
 }
 ```

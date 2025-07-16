@@ -39,9 +39,21 @@ export interface TabBarState {
   /**
    * @Trace
    *
-   * 当前选中的 item 的索引;
-   * */
+   * 当前选中的 item 的索引.
+   *
+   * 可用于判断是否选中了某个 item, 例如:
+   *   isSelected = state.currentIndex == index;
+   *
+   */
   readonly currentIndex: number;
+
+  /**
+   * 指示当前 TabBar 是否处于滑动交互中。
+   *
+   * 当用户在 `Tabs` 上进行滑动(左右切换)时，此值将变为 `true`, 在滑动交互结束后变回 `false`.
+   *
+   */
+  readonly isSwiping: boolean;
 
   /**
    * @Trace
@@ -188,6 +200,7 @@ export struct TabBar {
   }
 
   private onAnimationStart(index: number, targetIndex: number, event: TabsAnimationEvent, tabsWidth: number): void {
+    this.mState.isSwiping = false;
     this.mState.fromIndex = index;
     this.mState.toIndex = index;
     this.mState.distance = 0;
@@ -199,6 +212,7 @@ export struct TabBar {
       return;
     }
 
+    this.mState.isSwiping = false;
     this.mState.fromIndex = index;
     this.mState.toIndex = index;
     this.mState.distance = 0;
@@ -242,6 +256,7 @@ export struct TabBar {
      distance = Math.abs(currentOffset) / tabsWidth;
     }
 
+    this.mState.isSwiping = true;
     this.mState.fromIndex = fromIndex;
     this.mState.toIndex = toIndex;
     this.mState.distance = distance;
@@ -461,6 +476,8 @@ struct ScrollIndicator {
 class TabBarStateImpl implements TabBarState {
   @Trace private mCurrentIndex: number = 0;
   private mPreviousIndex: number = 0;
+
+  @Trace isSwiping: boolean = false;
 
   @Trace fromIndex: number = 0;
   @Trace toIndex: number = 0;
