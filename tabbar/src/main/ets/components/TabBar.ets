@@ -146,6 +146,7 @@ export struct TabBar {
 
   @Local private mCurrentItemLayoutInfo?: TabBarItemLayoutInfo = undefined;
   @Local private mPreviousItemLayoutInfo?: TabBarItemLayoutInfo = undefined;
+  private mSwiped = false;
 
   aboutToAppear(): void {
     if ( this.itemBuilder == undefined ) {
@@ -200,11 +201,20 @@ export struct TabBar {
   }
 
   private onAnimationStart(index: number, targetIndex: number, event: TabsAnimationEvent, tabsWidth: number): void {
-    this.mState.isSwiping = false;
-    this.mState.fromIndex = index;
-    this.mState.toIndex = index;
-    this.mState.distance = 0;
-    this.updateScrollIndicatorLayout();
+    if ( this.items.length == 0 || Number.isNaN(tabsWidth) || !Number.isFinite(tabsWidth) || tabsWidth <= 0 ) {
+      return;
+    }
+
+    if ( index == targetIndex ) {
+      this.mState.isSwiping = false;
+      this.mState.fromIndex = index;
+      this.mState.toIndex = index;
+      this.mState.distance = 0;
+      this.updateScrollIndicatorLayout();
+      return;
+    }
+
+    this.onSwipeEvent(index, event, tabsWidth, false);
   }
 
   private onAnimationEnd(index: number, event: TabsAnimationEvent, tabsWidth: number): void {
@@ -219,7 +229,7 @@ export struct TabBar {
     this.updateScrollIndicatorLayout();
   }
 
-  private onSwipeEvent(index: number, event: TabsAnimationEvent, tabsWidth: number): void {
+  private onSwipeEvent(index: number, event: TabsAnimationEvent, tabsWidth: number, isSwiping: boolean = true): void {
     if ( this.items.length == 0 || Number.isNaN(tabsWidth) || !Number.isFinite(tabsWidth) || tabsWidth <= 0 ) {
       return;
     }
@@ -256,7 +266,11 @@ export struct TabBar {
      distance = Math.abs(currentOffset) / tabsWidth;
     }
 
-    this.mState.isSwiping = true;
+    if ( !this.mSwiped ) {
+      this.mSwiped = true;
+    }
+
+    this.mState.isSwiping = isSwiping;
     this.mState.fromIndex = fromIndex;
     this.mState.toIndex = toIndex;
     this.mState.distance = distance;
@@ -354,7 +368,7 @@ export struct TabBar {
   }
 
   private updateScrollIndicatorLayout() {
-    const animated = this.mCurrentItemLayoutInfo != undefined && this.mPreviousItemLayoutInfo != undefined;
+    const animated = !this.mState.isSwiping && (this.mSwiped || (this.mCurrentItemLayoutInfo != undefined && this.mPreviousItemLayoutInfo != undefined));
 
     const info = this.mCurrentItemLayoutInfo;
     if ( info ) {
