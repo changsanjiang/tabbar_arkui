@@ -21,11 +21,20 @@ export enum TabBarScrollIndicatorSizeMode {
   EqualItemContentSize,
 }
 
+/** 指示条样式; */
 export enum TabBarScrollIndicatorStyle {
   /** 不显示指示条; */
   None,
   /** 圆角/胶囊样式; */
   Rounded,
+}
+
+/** 指示条滑动行为方式; */
+export enum TabBarScrollIndicatorBehavior {
+  /** 滑动过程中指示条渐渐拉长再渐渐恢复; */
+  Stretch,
+  /** 指示条同步滑动; */
+  Follow,
 }
 
 /** 可以是任意对象, 对应 itemBuilder 构建参数中的 item; */
@@ -116,6 +125,8 @@ export struct TabBar {
   @Param scrollIndicatorStyle: TabBarScrollIndicatorStyle = TabBarScrollIndicatorStyle.Rounded;
   /** 指示条宽度模式; 默认值: TabBarScrollIndicatorSizeMode.SpecifiedSize, 使用指定的大小; */
   @Param scrollIndicatorSizeMode: TabBarScrollIndicatorSizeMode = TabBarScrollIndicatorSizeMode.SpecifiedSize;
+  /** 指示条滑动行为方式; 默认值: TabBarScrollIndicatorBehavior.Stretch; */
+  @Param scrollIndicatorBehavior: TabBarScrollIndicatorBehavior = TabBarScrollIndicatorBehavior.Stretch;
   /** 指示条宽度; 默认值: 12.0; */
   @Param scrollIndicatorWidth: number = 12.0;
   /** 指示条高度; 默认值: 3.0; */
@@ -204,9 +215,10 @@ export struct TabBar {
     if ( this.items.length == 0 || Number.isNaN(tabsWidth) || !Number.isFinite(tabsWidth) || tabsWidth <= 0 ) {
       return;
     }
+    this.mState.isSwiping = false;
+    this.mState.isAnimating = true;
 
     if ( index == targetIndex ) {
-      this.mState.isSwiping = false;
       this.mState.fromIndex = index;
       this.mState.toIndex = index;
       this.mState.distance = 0;
@@ -221,8 +233,9 @@ export struct TabBar {
     if ( this.items.length == 0 || Number.isNaN(tabsWidth) || !Number.isFinite(tabsWidth) || tabsWidth <= 0 ) {
       return;
     }
-
     this.mState.isSwiping = false;
+    this.mState.isAnimating = false;
+
     this.mState.fromIndex = index;
     this.mState.toIndex = index;
     this.mState.distance = 0;
@@ -379,6 +392,7 @@ export struct TabBar {
               info,
               this.mLayoutHeight,
               this.scrollIndicatorSizeMode,
+              this.scrollIndicatorBehavior,
               this.scrollIndicatorAlign,
               this.scrollIndicatorWidth,
               this.scrollIndicatorHeight,
@@ -399,6 +413,7 @@ export struct TabBar {
           info,
           this.mLayoutHeight,
           this.scrollIndicatorSizeMode,
+          this.scrollIndicatorBehavior,
           this.scrollIndicatorAlign,
           this.scrollIndicatorWidth,
           this.scrollIndicatorHeight,
@@ -427,7 +442,7 @@ export struct TabBar {
 @ComponentV2
 struct TabBarLayout {
   @Require @Param items: TabBarItem[];
-  @Require @Param state: TabBarState;
+  @Require @Param state: TabBarStateImpl;
   @Param itemBuilderOptions?: Object = undefined;
   @BuilderParam itemBuilder: (index: number, item: TabBarItem, state: TabBarState, options?: TabBarItemBuilderOptions) => void;
   @Event onItemClick: (index: number, item: TabBarItem, state: TabBarState) => void;
@@ -451,6 +466,9 @@ struct TabBarLayout {
         }
       }
       .onClick(() => {
+        if ( this.state.isSwiping || this.state.isAnimating ) {
+          return;
+        }
         this.onItemClick?.(index, item, this.state);
       })
       .onDetach(() => this.onDetachItemCallback(index))
@@ -492,6 +510,7 @@ class TabBarStateImpl implements TabBarState {
   private mPreviousIndex: number = 0;
 
   @Trace isSwiping: boolean = false;
+  @Trace isAnimating: boolean = false;
 
   @Trace fromIndex: number = 0;
   @Trace toIndex: number = 0;
@@ -716,6 +735,7 @@ class ScrollIndicatorViewModel {
     info: TabBarItemLayoutInfo,
     barHeight: number,
     sizeMode: TabBarScrollIndicatorSizeMode,
+    scrollBehavior: TabBarScrollIndicatorBehavior,
     align: VerticalAlign,
     specifedWidth: number,
     specifedHeight: number,
@@ -731,34 +751,74 @@ class ScrollIndicatorViewModel {
     let layoutSize: SizeResult;
     let offsetX: number;
     if ( fromIndex < toIndex ) {
-      const leftViewCenterX = fromInfo.x + fromInfo.layoutSize.width * 0.5;
-      const rightViewCenterX = toInfo.x + toInfo.layoutSize.width * 0.5;
-      const leftViewMinX = fromInfo.x;
-      const rightViewMaxX = toInfo.x + toInfo.layoutSize.width;
+      const fromViewCenterX = fromInfo.x + fromInfo.layoutSize.width * 0.5;
+      const toViewCenterX = toInfo.x + toInfo.layoutSize.width * 0.5;
+      const fromViewLeft = fromInfo.x;
+      const toViewRight = toInfo.x + toInfo.layoutSize.width;
 
-      const leftSize = this.calculateIndicatorLayoutSizeBy(fromInfo, sizeMode, specifedWidth, specifedHeight, extraWidth, extraHeight);
-      const rightSize = this.calculateIndicatorLayoutSizeBy(toInfo, sizeMode, specifedWidth, specifedHeight, extraWidth, extraHeight);
+      const fromIndicatorSize = this.calculateIndicatorLayoutSizeBy(fromInfo, sizeMode, specifedWidth, specifedHeight, extraWidth, extraHeight);
+      const toIndicatorSize = this.calculateIndicatorLayoutSizeBy(toInfo, sizeMode, specifedWidth, specifedHeight, extraWidth, extraHeight);
 
-      const factor = 1 - Math.abs(rightSize.width - leftSize.width) / Math.max(rightSize.width, leftSize.width);
-      const distance = (rightViewMaxX - leftViewMinX) * factor;
-      let indicatorWidth = 0.0;
-      // 小于 0.5 开始变长
-      if ( progress < 0.5 ) {
-        indicatorWidth = leftSize.width * ( 1 - progress ) + rightSize.width * progress + distance * progress;
+      switch (scrollBehavior) {
+        case TabBarScrollIndicatorBehavior.Stretch: {
+          const stretchFactor = 1 - Math.abs(toIndicatorSize.width - fromIndicatorSize.width) / Math.max(toIndicatorSize.width, fromIndicatorSize.width);
+          const stretchDistance = (toViewRight - fromViewLeft) * stretchFactor;
+          let interpolatedWidth: number;
+          // 小于 0.5 开始变长
+          if ( progress < 0.5 ) {
+            interpolatedWidth = fromIndicatorSize.width * ( 1 - progress ) + toIndicatorSize.width * progress + stretchDistance * progress;
+          }
+          // 超过 0.5 开始缩小
+          else {
+            interpolatedWidth = fromIndicatorSize.width * ( 1 - progress ) + toIndicatorSize.width * progress + stretchDistance * ( 1 - progress);
+          }
+
+          let interpolatedHeight: number;
+          if ( fromIndicatorSize.height == toIndicatorSize.height ) {
+            interpolatedHeight = fromIndicatorSize.height;
+          }
+          else {
+            interpolatedHeight = fromIndicatorSize.height + (toIndicatorSize.height - fromIndicatorSize.height) * progress;
+          }
+
+          const centerDeltaX = toViewCenterX - fromViewCenterX;
+          const indicatorLeft = fromViewCenterX + centerDeltaX * progress - interpolatedWidth * 0.5;
+
+          layoutSize = {
+            width: interpolatedWidth,
+            height: interpolatedHeight
+          };
+          offsetX = indicatorLeft;
+        }
+          break;
+        case TabBarScrollIndicatorBehavior.Follow: {
+          let interpolatedWidth: number;
+          if ( fromIndicatorSize.width == toIndicatorSize.width ) {
+            interpolatedWidth = fromIndicatorSize.width;
+          }
+          else {
+            interpolatedWidth = fromIndicatorSize.width + (toIndicatorSize.width - fromIndicatorSize.width) * progress;
+          }
+
+          let interpolatedHeight: number;
+          if ( fromIndicatorSize.height == toIndicatorSize.height ) {
+            interpolatedHeight = fromIndicatorSize.height;
+          }
+          else {
+            interpolatedHeight = fromIndicatorSize.height + (toIndicatorSize.height - fromIndicatorSize.height) * progress;
+          }
+
+          const centerDeltaX = toViewCenterX - fromViewCenterX;
+          const indicatorLeft = fromViewCenterX + centerDeltaX * progress - interpolatedWidth * 0.5;
+
+          layoutSize = {
+            width: interpolatedWidth,
+            height: interpolatedHeight
+          };
+          offsetX = indicatorLeft;
+        }
+          break;
       }
-      // 超过 0.5 开始缩小
-      else {
-        indicatorWidth = leftSize.width * ( 1 - progress ) + rightSize.width * progress + distance * ( 1 - progress);
-      }
-
-      const maxOffset = rightViewCenterX - leftViewCenterX;
-      const currOffset = leftViewCenterX + maxOffset * progress - indicatorWidth * 0.5;
-
-      layoutSize = {
-        width: indicatorWidth,
-        height: leftSize.height
-      };
-      offsetX = currOffset;
     }
     else {
       layoutSize = this.calculateIndicatorLayoutSizeBy(info, sizeMode, specifedWidth, specifedHeight, extraWidth, extraHeight);
