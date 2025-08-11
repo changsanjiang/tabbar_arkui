@@ -146,6 +146,18 @@ export struct TabBar {
   @Param contentStartOffset: number = 12.0;
   /** 内容结束边距; 默认值: 12.0; */
   @Param contentEndOffset: number = 12.0;
+  /**
+   * 视觉居中偏移量;
+   *
+   * 当 TabBar 未占满屏幕宽度, 在左侧或右侧存在其他控件时(例如搜索按钮、筛选按钮等),
+   * 默认的滑动至`居中`位置在视觉上会出现偏移;
+   * 设置该值可以人为调整居中的参考点;
+   *
+   * 例如:
+   * - 左侧有一个宽度为 44 的按钮, TabBar 占据屏幕剩余空间, 为了让视觉中心保持在屏幕中间,
+   *   可以将该值设为 +22 (按钮宽度的一半), 表示向左边多滑动 22 的宽度, 这样视觉上就看起来居中的;
+   */
+  @Param visualCenterOffset: number = 0.0;
 
   private mTabBarLayoutManager = new TabBarLayoutManager();
   private mScrollIndicatorViewModel: ScrollIndicatorViewModel = new ScrollIndicatorViewModel();
@@ -209,6 +221,26 @@ export struct TabBar {
     .width('100%')
     .height(this.barHeight)
     .onAreaChange((oldArea, newArea) => this.onBarAreaChange(oldArea, newArea))
+    .onGestureRecognizerJudgeBegin((event: BaseGestureEvent, current: GestureRecognizer, _: Array<GestureRecognizer>): GestureJudgeResult => { // 在识别器即将要成功时，根据当前组件状态，设置识别器使能状态
+      if ( current ) {
+        if ( this.items.length == 0 ) {
+          return GestureJudgeResult.REJECT;
+        }
+
+        const target = current.getEventTargetInfo();
+        if (target && current.isBuiltIn() && current.getType() == GestureControl.GestureType.PAN_GESTURE) {
+          const panEvent = event as PanGestureEvent;
+          if (panEvent && panEvent.velocityX < 0 && this.mScroller.isAtEnd()) {
+            return GestureJudgeResult.REJECT;
+          }
+
+          if (panEvent && panEvent.velocityX > 0 && this.mScroller.currentOffset().xOffset === 0) {
+            return GestureJudgeResult.REJECT;
+          }
+        }
+      }
+      return GestureJudgeResult.CONTINUE;
+    }, true)
   }
 
   private onAnimationStart(index: number, targetIndex: number, event: TabsAnimationEvent, tabsWidth: number): void {
@@ -348,7 +380,8 @@ export struct TabBar {
     if ( !info ) {
       return;
     }
-    let offsetX = info.x + info.layoutSize.width * 0.5 - this.mLayoutWidth * 0.5;
+
+    let offsetX = info.x + info.layoutSize.width * 0.5 - this.mLayoutWidth * 0.5 + this.visualCenterOffset/* offsetX 增大表示内容向左移动，视觉中心向右偏 */;
     const minOffsetX = 0;
     const maxOffsetX = this.mContentWidth - this.mLayoutWidth;
     if ( offsetX > maxOffsetX ) {
@@ -357,7 +390,7 @@ export struct TabBar {
     else if ( offsetX < minOffsetX ) {
       offsetX = minOffsetX;
     }
-    this.mScroller.scrollTo({ xOffset: offsetX, yOffset: 0, animation: { curve: Curve.Linear, duration: 150 } });
+    this.mScroller.scrollTo({ xOffset: offsetX, yOffset: 0, animation: { curve: Curve.EaseOut, duration: 150 } });
     this.cancelScheduledScrollTask();
   }
 
