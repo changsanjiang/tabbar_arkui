@@ -1,3 +1,6 @@
+#### [1.0.5] 2025/08/11
+- 添加`visualCenterOffset`, 用于控制视觉中心偏移量;
+
 #### [v1.0.4] 2025/07/28
 - 添加`TabBarScrollIndicatorBehavior`, 用来控制指示条滑动行为;
 

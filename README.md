@@ -32,7 +32,7 @@ ohpm i @sj/tabbar
 ```json
 {
   "dependencies": {
-    "@sj/tabbar": "^1.0.4"
+    "@sj/tabbar": "^1.0.5"
   }
 }
 ```

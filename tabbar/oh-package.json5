@@ -1,6 +1,6 @@
 {
   "name": "@sj/tabbar",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "一个灵活、可定制的标签栏组件，适用于频道页、选项切换、与 `Tabs` 联动等场景。",
   "main": "Index.ets",
   "author": "csj",
